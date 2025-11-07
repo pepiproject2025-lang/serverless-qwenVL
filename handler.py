@@ -72,15 +72,38 @@ FastVisionModel.for_inference(model)
 processor = AutoProcessor.from_pretrained(MODEL_BASE)
 
 # ===== 유틸 =====
+def _normalize_github_url(url: str) -> str:
+    # blob → raw, refs/heads → branch 이름 정리, 쿼리 제거
+    if "github.com" in url and "/blob/" in url:
+        url = url.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/")
+    url = url.replace("/refs/heads/", "/")
+    if "raw.githubusercontent.com" in url and "?" in url:
+        url = url.split("?", 1)[0]
+    return url
+
 def _load_image(x: str) -> Image.Image:
-    """x: http(s) URL 또는 base64 문자열"""
-    if x.startswith("http://") or x.startswith("https://"):
+    if x.startswith(("http://", "https://")):
         import requests
-        resp = requests.get(x, timeout=10)
-        resp.raise_for_status()
-        return Image.open(io.BytesIO(resp.content)).convert("RGB")
+        url = _normalize_github_url(x)
+        try:
+            r = requests.get(url, timeout=10, allow_redirects=True)
+            status = r.status_code
+            ctype = r.headers.get("Content-Type", "")
+            print(f"[IMAGE] GET {url} -> {status} {ctype}")
+            # 이미지가 아니면 본문 일부를 같이 출력
+            if not ctype.lower().startswith("image/"):
+                snippet = r.text[:200].replace("\n"," ")
+                raise RuntimeError(f"Non-image content: status={status}, content-type={ctype}, body[:200]={snippet}")
+            r.raise_for_status()
+            return Image.open(io.BytesIO(r.content)).convert("RGB")
+        except Exception as e:
+            raise RuntimeError(f"Image fetch failed: {url} | {type(e).__name__}: {e}")
     # base64
-    return Image.open(io.BytesIO(base64.b64decode(x))).convert("RGB")
+    try:
+        return Image.open(io.BytesIO(base64.b64decode(x))).convert("RGB")
+    except Exception as e:
+        raise RuntimeError(f"Invalid base64 image: {type(e).__name__}: {e}")
+
 
 def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
     pil_imgs = [_load_image(s) for s in images]
@@ -126,7 +149,10 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
         result = _infer(prompt, images, gen)
         return {"output": result}
     except Exception as e:
-        return {"error": str(e)}
+        import traceback
+        tb = traceback.format_exc()[:4000]
+        print("[ERROR]", tb)
+        return {"error": f"{e}", "trace": tb}
     
 
 if __name__ == "__main__":
