@@ -9,15 +9,15 @@ from peft import PeftModel
 
 # ===== 환경 변수 =====
 # Runpod 콘솔에서 Volumes : <네트워크 볼륨> -> Mount Path: /runpod-volume
-MODEL_BASE = os.getenv("MODEL_BASE", "/runpod-volume/models/Qwen2.5-VL-7B-Instruct")
-LORA_PATH = os.getenv("LORA_PATH", "/runpod-volume/checkpoints/qwen25vl_lora")
+MODEL_BASE = os.getenv("MODEL_BASE", "/workspace/models/Qwen2.5_VL_7B_Instruct")
+LORA_PATH = os.getenv("LORA_PATH", "/workspace/outputs/checkpoint-11200")
 LOAD_4BIT = os.getenv("LOAD_4BIT", "true").lower() == "true"
 MERGE_LORA = os.getenv("MERGE_LORA", "false").lower() == "true"     # 병합 고정 옵션
 
 # ===== 모델 로드 =====
 print(f"[INIT] MODEL_BASE={MODEL_BASE}")
 print(f"[INIT] LORA_PATH={LORA_PATH}")
-print(f"[INIT] LOAD_4BIT={LOAD_4BIt}, MERGE_LORA={MERGE_LORA}")
+print(f"[INIT] LOAD_4BIT={LOAD_4BIT}, MERGE_LORA={MERGE_LORA}")
 
 # Unsloth FastVisionModel : Qwen2.5-VL에 맞는 헬퍼
 from unsloth import FastVisionModel
@@ -67,13 +67,13 @@ model = _apply_lora_if_available(model)
 #     except Exception as e:
 #         print(f"[LORA] merge failed: {e}")
 
-FastVisionMoodel.for_inference(model)
+FastVisionModel.for_inference(model)
 processor = AutoProcessor.from_pretrained(MODEL_BASE)
 
 # ===== 유틸 =====
 def _load_image(x: str) -> Image.Image:
     """x: http(s) URL 또는 base64 문자열"""
-    if x.startswith("http://") or x.startwith("https://"):
+    if x.startswith("http://") or x.startswith("https://"):
         import requests
         resp = requests.get(x, timeout=10)
         resp.raise_for_status()
@@ -87,14 +87,14 @@ def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
 
     gen = gen or {}
     max_new_tokens  = int(gen.get("max_new_tokens", 512))
-    tempeature      = float(gen.get("temperature", 0.2))
+    temperature      = float(gen.get("temperature", 0.2))
     top_p           = float(gen.get("top_p", 0.9))
     top_k           = int(gen.get("top_k", 50))
 
     output = model.generate(
         **inputs,
         max_new_tokens=max_new_tokens,
-        temperature=tempeature,
+        temperature=temperature,
         top_p=top_p,
         top_k=top_k,
     )
@@ -108,7 +108,7 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
     {
         "input": {
             "prompt": "...",
-            "images": [",url or base64>", "..."],
+            "images": ["<url or base64>", "..."],
             "gen": {"max_new_tokens": 512, "temperature":0.2}
         }
     }
