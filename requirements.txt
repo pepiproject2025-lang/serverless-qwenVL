@@ -5,4 +5,5 @@ pillow==11.3.0
 runpod==1.6.2
 requests==2.32.3
 unsloth @ git+https://github.com/unslothai/unsloth.git@0a69adb79ab9c405f504b19d2969c875a41ec430
-bitsandbytes==0.44.1
+bitsandbytes==0.48.1
+triton==3.4.0
