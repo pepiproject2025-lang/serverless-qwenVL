@@ -107,23 +107,34 @@ def _load_image(x: str) -> Image.Image:
 
 def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
     pil_imgs = [_load_image(s) for s in images]
-    inputs = processor(text=prompt, images=pil_imgs, return_tensors="pt").to(model.device)
+
+    messages = [{
+        "role": "user",
+        "content": [
+            *([{"type": "image", "image": img} for img in pil_imgs]),
+            {"type": "text", "text": prompt},
+        ],
+    }]
+
+    # 템플릿이 이미지 토큰을 자동 삽입
+    text = processor.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=False,
+    )
+
+    inputs = processor(text=text, images=pil_imgs, return_tensors="pt").to(model.device)
 
     gen = gen or {}
-    max_new_tokens  = int(gen.get("max_new_tokens", 512))
-    temperature      = float(gen.get("temperature", 0.2))
-    top_p           = float(gen.get("top_p", 0.9))
-    top_k           = int(gen.get("top_k", 50))
-
     output = model.generate(
         **inputs,
-        max_new_tokens=max_new_tokens,
-        temperature=temperature,
-        top_p=top_p,
-        top_k=top_k,
+        max_new_tokens=int(gen.get("max_new_tokens", 512)),
+        temperature=float(gen.get("temperature", 0.2)),
+        top_p=float(gen.get("top_p", 0.9)),
+        top_k=int(gen.get("top_k", 50)),
     )
-    text = tokenizer.decode(output[0], skip_special_tokens=True)
-    return text
+    return tokenizer.decode(output[0], skip_special_tokens=True)
+
 
 # ===== Runpod 핸들러 =====
 def handler(event: Dict[str, Any]) -> Dict[str, Any]:
