@@ -20,8 +20,8 @@ RUN python3 -m pip install --upgrade pip && \
 
 # 나머지 패키지
 COPY requirements.txt .
-RUN python3 -m pip install --no-chache-dir -r requirements.txt && \
-    python - <<'PY'
+RUN python3 -m pip install --no-cache-dir -r requirements.txt && \
+    python3 - <<'PY'
 import torch, sys
 print("Torch: ", torch.__version__, "CUDA: ", torch.version.cuda)
 print("CUDA available: ", torch.cuda.is_available())
