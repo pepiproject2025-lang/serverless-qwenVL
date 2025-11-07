@@ -2,6 +2,9 @@ import os, io, base64, json
 from typing import List, Dict, Any
 from PIL import Image
 
+# Unsloth FastVisionModel : Qwen2.5-VL에 맞는 헬퍼
+from unsloth import FastVisionModel
+
 import torch
 import runpod
 from transformers import AutoProcessor
@@ -18,9 +21,6 @@ MERGE_LORA = os.getenv("MERGE_LORA", "false").lower() == "true"     # 병합 고
 print(f"[INIT] MODEL_BASE={MODEL_BASE}")
 print(f"[INIT] LORA_PATH={LORA_PATH}")
 print(f"[INIT] LOAD_4BIT={LOAD_4BIT}, MERGE_LORA={MERGE_LORA}")
-
-# Unsloth FastVisionModel : Qwen2.5-VL에 맞는 헬퍼
-from unsloth import FastVisionModel
 
 torch.set_grad_enabled(False)
 
