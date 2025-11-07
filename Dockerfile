@@ -1,3 +1,4 @@
+# 제발 돼라...
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
 WORKDIR /workspace
