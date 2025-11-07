@@ -150,7 +150,12 @@ def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
         top_p=float(gen.get("top_p", 0.9)),
         top_k=int(gen.get("top_k", 50)),
     )
-    return tokenizer.decode(output[0], skip_special_tokens=True)
+
+    # 🔧 핵심: 입력 길이 이후만 디코드
+    input_len = inputs["input_ids"].shape[1]
+    gen_only = output[:, input_len:]
+    text = tokenizer.decode(gen_only[0], skip_special_tokens=True)
+    return text
 
 
 
