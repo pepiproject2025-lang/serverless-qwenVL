@@ -1,0 +1,8 @@
+torch==2.4.0
+transformers>=4.45.0
+accelerate>=0.33.0
+unsloth>=2024.9.0
+peft>=0.11.0
+pillow
+runpod
+requests

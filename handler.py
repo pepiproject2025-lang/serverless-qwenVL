@@ -1,0 +1,133 @@
+import os, io, base64, json
+from typing import List, Dict, Any
+from PIL import Image
+
+import torch
+import runpod
+from transformers import AutoProcessor
+from peft import PeftModel
+
+# ===== 환경 변수 =====
+# Runpod 콘솔에서 Volumes : <네트워크 볼륨> -> Mount Path: /runpod-volume
+MODEL_BASE = os.getenv("MODEL_BASE", "/runpod-volume/models/Qwen2.5-VL-7B-Instruct")
+LORA_PATH = os.getenv("LORA_PATH", "/runpod-volume/checkpoints/qwen25vl_lora")
+LOAD_4BIT = os.getenv("LOAD_4BIT", "true").lower() == "true"
+MERGE_LORA = os.getenv("MERGE_LORA", "false").lower() == "true"     # 병합 고정 옵션
+
+# ===== 모델 로드 =====
+print(f"[INIT] MODEL_BASE={MODEL_BASE}")
+print(f"[INIT] LORA_PATH={LORA_PATH}")
+print(f"[INIT] LOAD_4BIT={LOAD_4BIt}, MERGE_LORA={MERGE_LORA}")
+
+# Unsloth FastVisionModel : Qwen2.5-VL에 맞는 헬퍼
+from unsloth import FastVisionModel
+
+torch.set_grad_enabled(False)
+
+model, tokenizer = FastVisionModel.from_pretrained(
+    model_name = MODEL_BASE,
+    load_in_4bit = LOAD_4BIT,
+)
+
+# LoRA 적용 (가능한 경로들을 안전하게 시도)
+def _apply_lora_if_available(base_model):
+    if not LORA_PATH or not os.path.exists(LORA_PATH):
+        print("[LORA] path missing or not found, skip.")
+        return base_model
+    
+    print(f"[LORA] Trying to load LoRA from: {LORA_PATH}")
+    # 1) 우선 PeftModel 경로 (일반적)
+    try:
+        peft_model = PeftModel.from_pretrained(base_model, LORA_PATH)
+        peft_model.eval()
+        print("[LORA] Loaded via PeftModel.from_pretrained.")
+        return peft_model
+    except Exception as e:
+        print(f"[LORA] Peft load failed: {e}")
+
+    # 2) Unsloth 래퍼에 load_adapter가 있는 경우
+    try:
+        if hasattr(base_model, "load_adapter"):
+            base_model.load_adapter(LORA_PATH)
+            print("[LORA] Loaded via base_model.load_adapter.")
+            return base_model
+    except Exception as e:
+        print(f"[LORA] base_model.load_adapter failed: {e}")
+
+    print("[LORA] No LoRA applied.")
+    return base_model
+
+model = _apply_lora_if_available(model)
+
+# (선택) 배포 고정/속도 개선: LoRA 병합
+# if MERGE_LORA:
+#     try:
+#         model = model.merge_and_unload()
+#         print("[LORA] merge_and_upload done.")
+#     except Exception as e:
+#         print(f"[LORA] merge failed: {e}")
+
+FastVisionMoodel.for_inference(model)
+processor = AutoProcessor.from_pretrained(MODEL_BASE)
+
+# ===== 유틸 =====
+def _load_image(x: str) -> Image.Image:
+    """x: http(s) URL 또는 base64 문자열"""
+    if x.startswith("http://") or x.startwith("https://"):
+        import requests
+        resp = requests.get(x, timeout=10)
+        resp.raise_for_status()
+        return Image.open(io.BytesIO(resp.content)).convert("RGB")
+    # base64
+    return Image.open(io.BytesIO(base64.b64decode(x))).convert("RGB")
+
+def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
+    pil_imgs = [_load_image(s) for s in images]
+    inputs = processor(text=prompt, images=pil_imgs, return_tensors="pt").to(model.device)
+
+    gen = gen or {}
+    max_new_tokens  = int(gen.get("max_new_tokens", 512))
+    tempeature      = float(gen.get("temperature", 0.2))
+    top_p           = float(gen.get("top_p", 0.9))
+    top_k           = int(gen.get("top_k", 50))
+
+    output = model.generate(
+        **inputs,
+        max_new_tokens=max_new_tokens,
+        temperature=tempeature,
+        top_p=top_p,
+        top_k=top_k,
+    )
+    text = tokenizer.decode(output[0], skip_special_tokens=True)
+    return text
+
+# ===== Runpod 핸들러 =====
+def handler(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    기대 입력(JSON):
+    {
+        "input": {
+            "prompt": "...",
+            "images": [",url or base64>", "..."],
+            "gen": {"max_new_tokens": 512, "temperature":0.2}
+        }
+    }
+    """
+    try:
+        payload = event.get("input", {}) if isinstance(event, dict) else {}
+        prompt  = payload.get("prompt", "Describe the image.")
+        images  = payload.get("images", [])
+        gen     = payload.get("gen", {})
+
+        if not images:
+            return {"error": "images required (url or base64 list)"}
+        
+        result = _infer(prompt, images, gen)
+        return {"output": result}
+    except Exception as e:
+        return {"error": str(e)}
+    
+
+if __name__ == "__main__":
+    # Runpod serverless runtime
+    runpod.serverless.start({"handler": handler})
