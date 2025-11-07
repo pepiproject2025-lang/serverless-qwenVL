@@ -1,8 +1,10 @@
+# CUDA 12.1 런타임 기준 (L4/A10G에서 호환)
 torch==2.4.0
-transformers>=4.45.0
-accelerate>=0.33.0
-unsloth>=2024.9.0
-peft>=0.11.0
-pillow
-runpod
-requests
+transformers==4.45.2
+accelerate==0.33.0
+unsloth==2024.9.0
+peft==0.11.1
+pillow==10.4.0
+runpod==1.6.2
+requests==2.32.3
+# (옵션) tokenizers==0.19.1  # 충돌나면 추가
