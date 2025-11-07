@@ -2,7 +2,7 @@ FROM nvidia/cuda:12.6.2-cudnn8-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y python3 python3-pip git && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace
-ARG CACHE_BREAKER=2025-11-07-1  # -> 캐시 깨기용
+ARG CACHE_BREAKER=2025-11-07-1  # 캐시 깨기용
 RUN echo "CACHE_BREAKER=$CACHE_BREAKER"
 
 # torch는 cu128 채널에서 설치
