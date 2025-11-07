@@ -105,9 +105,13 @@ def _load_image(x: str) -> Image.Image:
         raise RuntimeError(f"Invalid base64 image: {type(e).__name__}: {e}")
 
 
+def _count_image_tokens(txt: str) -> int:
+    return txt.count("<|image_pad|>")
+
 def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
     pil_imgs = [_load_image(s) for s in images]
 
+    # 1) 우선 공식 템플릿 시도
     messages = [{
         "role": "user",
         "content": [
@@ -116,13 +120,26 @@ def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
         ],
     }]
 
-    # 템플릿이 이미지 토큰을 자동 삽입
-    text = processor.apply_chat_template(
-        messages,
-        add_generation_prompt=True,
-        tokenize=False,
-    )
+    try:
+        text = processor.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            tokenize=False,
+        )
+    except Exception:
+        text = None
 
+    # 2) 템플릿 결과 점검: 이미지 토큰이 0개면 수동으로 삽입 (확실한 방법)
+    if not text or _count_image_tokens(text) == 0:
+        image_tokens = "".join(["<|vision_start|><|image_pad|><|vision_end|>" for _ in pil_imgs])
+        # (선택) 대화 포맷 토큰이 필요한 버전 대비
+        text = f"<|im_start|>user\n{image_tokens}\n{prompt}\n<|im_end|>\n<|im_start|>assistant\n"
+
+    # 안전 검사: 이미지 개수 == 토큰 개수
+    n_tok = _count_image_tokens(text)
+    assert n_tok == len(pil_imgs), f"image tokens {n_tok} != images {len(pil_imgs)}"
+
+    # 3) 입력 만들기 & 생성
     inputs = processor(text=text, images=pil_imgs, return_tensors="pt").to(model.device)
 
     gen = gen or {}
@@ -134,6 +151,7 @@ def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
         top_k=int(gen.get("top_k", 50)),
     )
     return tokenizer.decode(output[0], skip_special_tokens=True)
+
 
 
 # ===== Runpod 핸들러 =====
