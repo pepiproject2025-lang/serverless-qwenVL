@@ -13,7 +13,7 @@ from peft import PeftModel
 # ===== 환경 변수 =====
 # Runpod 콘솔에서 Volumes : <네트워크 볼륨> -> Mount Path: /runpod-volume
 # worker -> runpod-volume으로 수정
-MODEL_BASE = os.getenv("MODEL_BASE", "/runpod-volume/models/Qwen3_VL_32B_Instruct")
+MODEL_BASE = os.getenv("MODEL_BASE", "/runpod-volume/models/Qwen3_VL_8B_Instruct")
 LORA_PATH = os.getenv("LORA_PATH", "/runpod-volume/outputs/checkpoint-11200")
 LOAD_4BIT = os.getenv("LOAD_4BIT", "true").lower() == "true"
 MERGE_LORA = os.getenv("MERGE_LORA", "false").lower() == "true"     # 병합 고정 옵션
