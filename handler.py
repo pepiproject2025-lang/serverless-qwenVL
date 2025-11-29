@@ -14,9 +14,26 @@ from peft import PeftModel
 # Runpod 콘솔에서 Volumes : <네트워크 볼륨> -> Mount Path: /runpod-volume
 # worker -> runpod-volume으로 수정
 MODEL_BASE = os.getenv("MODEL_BASE", "/runpod-volume/models/Qwen3_VL_8B_Instruct")
-LORA_PATH = os.getenv("LORA_PATH", "/runpod-volume/outputs/checkpoint-11200")
+LORA_PATH = os.getenv("LORA_PATH", "") # 로라 체크포인트 넣기
 LOAD_4BIT = os.getenv("LOAD_4BIT", "true").lower() == "true"
 MERGE_LORA = os.getenv("MERGE_LORA", "false").lower() == "true"     # 병합 고정 옵션
+
+MODELS_ROOT = "/runpod-volume/models"
+
+if not os.path.exists(MODELS_ROOT):
+    print(f"[CHECK] {MODELS_ROOT} 가 존재하지 않습니다.")
+else:
+    print(f"[CHECK] {MODELS_ROOT} 목록:")
+    try:
+        for name in os.listdir(MODELS_ROOT):
+            print("  -", name)
+    except Exception as e:
+        print(f"[CHECK] 모델 목록 조회 실패: {e}")
+
+if not os.path.exists(MODEL_BASE):
+    print(f"[ERROR] MODEL_BASE 경로가 존재하지 않습니다: {MODEL_BASE}")
+else:
+    print(f"[CHECK] MODEL_BASE 경로 확인됨: {MODEL_BASE}")
 
 # ===== 모델 로드 =====
 print(f"[INIT] MODEL_BASE={MODEL_BASE}")
@@ -67,6 +84,44 @@ model = _apply_lora_if_available(model)
 #         print("[LORA] merge_and_upload done.")
 #     except Exception as e:
 #         print(f"[LORA] merge failed: {e}")
+
+# ===== LoRA on/off 제어 =====
+HAS_LORA = isinstance(model, PeftModel)
+
+# PeftModel 안에 로드된 어댑터 이름 (대부분 "default" 하나임)
+DEFAULT_ADAPTER_NAME = None
+if HAS_LORA:
+    peft_config = getattr(model, "peft_config", None)
+    if isinstance(peft_config, dict) and peft_config:
+        DEFAULT_ADAPTER_NAME = list(peft_config.keys())[0]
+        print(f"[LORA] available adapter = {DEFAULT_ADAPTER_NAME}")
+
+def set_lora(enabled: bool):
+    """
+    요청마다 LoRA 사용 여부를 바꾸기 위한 헬퍼.
+    PeftModel 의 set_adapter / disable_adapter 를 이용한다.
+    """
+    if not HAS_LORA:
+        return
+
+    try:
+        if enabled:
+            name = DEFAULT_ADAPTER_NAME or "default"
+            if hasattr(model, "set_adapter"):
+                model.set_adapter(name)
+            print(f"[LORA] enabled (adapter={name})")
+        else:
+            if hasattr(model, "disable_adapter"):
+                model.disable_adapter()
+                print("[LORA] disabled via disable_adapter()")
+            else:
+                # disable_adapter 없는 구버전이면 완전히 끄지 못할 수도 있음
+                print("[LORA] disable_adapter() not found, cannot fully disable.")
+    except Exception as e:
+        print(f"[LORA] set_lora({enabled}) failed: {e}")
+
+# 초기 상태는 '진단 모드' 기준으로 LoRA 켜두기
+set_lora(True)
 
 FastVisionModel.for_inference(model)
 processor = AutoProcessor.from_pretrained(MODEL_BASE)
@@ -163,25 +218,52 @@ def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
 def handler(event: Dict[str, Any]) -> Dict[str, Any]:
     """
     기대 입력(JSON):
+
     {
-        "input": {
-            "prompt": "...",
-            "images": ["<url or base64>", "..."],
-            "gen": {"max_new_tokens": 512, "temperature":0.2}
-        }
+      "input": {
+        "prompt": "질문 또는 진단용 프롬프트",
+        "images": ["<url or base64>", ...],    
+        "gen": {"max_new_tokens": 512, "temperature":0.2}                 
+
+        # 새로 추가되는 필드
+        "mode": "diag" | "chat",         # 진단(diag) 또는 챗(chat)
+        "use_lora": true | false         
+      }
     }
     """
     try:
-        payload = event.get("input", {}) if isinstance(event, dict) else {}
-        prompt  = payload.get("prompt", "Describe the image.")
-        images  = payload.get("images", [])
-        gen     = payload.get("gen", {})
+        payload = event.get("input") or event or {}
+        prompt = payload.get("prompt", "Describe the image.")
+        images = payload.get("images") or []
+        gen = payload.get("gen") or {}
 
-        if not images:
-            return {"error": "images required (url or base64 list)"}
-        
+        # 1) 모드 & LoRA 사용 여부 결정
+        mode = payload.get("mode", "diag")  # "diag" or "chat"
+        use_lora_flag = payload.get("use_lora")
+        if use_lora_flag is None:
+            # 명시 안 해주면: 진단(diag)만 LoRA 사용, 챗(chat)은 LoRA 끔
+            use_lora_flag = (mode == "diag")
+
+        if HAS_LORA:
+            set_lora(bool(use_lora_flag))
+            print(f"[HANDLER] mode={mode}, use_lora={use_lora_flag}")
+        else:
+            print(f"[HANDLER] mode={mode}, HAS_LORA=False")
+
+        # 2) 모드별 기본 검증
+        if mode == "diag" and not images:
+            # 진단 모드에서는 이미지를 반드시 요구
+            return {"error": "images required (url or base64 list) for diag mode"}
+
+        # chat 모드에서는 images 없어도 _infer 가 텍스트만으로 동작함
         result = _infer(prompt, images, gen)
-        return {"output": result}
+
+        return {
+            "output": result,
+            "mode": mode,
+            "used_lora": bool(use_lora_flag) and HAS_LORA,
+        }
+
     except Exception as e:
         import traceback
         tb = traceback.format_exc()[:4000]
