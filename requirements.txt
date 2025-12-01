@@ -4,8 +4,9 @@ peft==0.17.1
 pillow==11.3.0
 runpod==1.6.2
 requests==2.32.5
-unsloth @ git+https://github.com/unslothai/unsloth.git@0a69adb79ab9c405f504b19d2969c875a41ec430
-unsloth_zoo==2025.10.3
+#unsloth @ git+https://github.com/unslothai/unsloth.git@0a69adb79ab9c405f504b19d2969c875a41ec430
+unsloth==2025.11.3
+unsloth_zoo==2025.11.4
 torch==2.8.0
 torchao==0.13.0
 torchaudio==2.8.0
