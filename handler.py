@@ -164,39 +164,69 @@ def _count_image_tokens(txt: str) -> int:
     return txt.count("<|image_pad|>")
 
 def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
-    pil_imgs = [_load_image(s) for s in images]
+    # images가 비었으면 텍스트-only 모드
+    if not images:
+        # 1) 메시지 템플릿 만들기 (이미지 없이)
+        messages = [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+            ],
+        }]
 
-    # 1) 우선 공식 템플릿 시도
-    messages = [{
-        "role": "user",
-        "content": [
-            *([{"type": "image", "image": img} for img in pil_imgs]),
-            {"type": "text", "text": prompt},
-        ],
-    }]
+        try:
+            text = processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=False,
+            )
+        except Exception:
+            # 혹시 템플릿 실패하면 수동 포맷
+            text = f"<|im_start|>user\n{prompt}\n<|im_end|>\n<|im_start|>assistant\n"
 
-    try:
-        text = processor.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            tokenize=False,
-        )
-    except Exception:
-        text = None
+        # 2) 이미지 없이 processor 호출
+        inputs = processor(text=text, return_tensors="pt").to(model.device)
 
-    # 2) 템플릿 결과 점검: 이미지 토큰이 0개면 수동으로 삽입 (확실한 방법)
-    if not text or _count_image_tokens(text) == 0:
-        image_tokens = "".join(["<|vision_start|><|image_pad|><|vision_end|>" for _ in pil_imgs])
-        # (선택) 대화 포맷 토큰이 필요한 버전 대비
-        text = f"<|im_start|>user\n{image_tokens}\n{prompt}\n<|im_end|>\n<|im_start|>assistant\n"
+    else:
+        # ===== 기존 멀티모달 경로 그대로 유지 =====
+        pil_imgs = [_load_image(s) for s in images]
 
-    # 안전 검사: 이미지 개수 == 토큰 개수
-    n_tok = _count_image_tokens(text)
-    assert n_tok == len(pil_imgs), f"image tokens {n_tok} != images {len(pil_imgs)}"
+        messages = [{
+            "role": "user",
+            "content": [
+                *([{"type": "image", "image": img} for img in pil_imgs]),
+                {"type": "text", "text": prompt},
+            ],
+        }]
 
-    # 3) 입력 만들기 & 생성
-    inputs = processor(text=text, images=pil_imgs, return_tensors="pt").to(model.device)
+        try:
+            text = processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=False,
+            )
+        except Exception:
+            text = None
 
+        if not text or _count_image_tokens(text) == 0:
+            image_tokens = "".join(
+                ["<|vision_start|><|image_pad|><|vision_end|>" for _ in pil_imgs]
+            )
+            text = (
+                f"<|im_start|>user\n{image_tokens}\n{prompt}\n"
+                f"<|im_end|>\n<|im_start|>assistant\n"
+            )
+
+        n_tok = _count_image_tokens(text)
+        assert n_tok == len(pil_imgs), f"image tokens {n_tok} != images {len(pil_imgs)}"
+
+        inputs = processor(
+            text=text,
+            images=pil_imgs,
+            return_tensors="pt",
+        ).to(model.device)
+
+    # ===== 공통: 생성 부분은 그대로 =====
     gen = gen or {}
     output = model.generate(
         **inputs,
@@ -206,7 +236,6 @@ def _infer(prompt: str, images: List[str], gen: Dict[str, Any] | None):
         top_k=int(gen.get("top_k", 50)),
     )
 
-    # 🔧 핵심: 입력 길이 이후만 디코드
     input_len = inputs["input_ids"].shape[1]
     gen_only = output[:, input_len:]
     text = tokenizer.decode(gen_only[0], skip_special_tokens=True)
