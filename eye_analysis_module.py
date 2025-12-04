@@ -41,7 +41,7 @@ from eye_rag_chatbot2 import (
 
 CHECKPOINT_DIR = "/workspace/outputs_py/checkpoint-15020"
 BASE_VL_MODEL_NAME = "unsloth/qwen3-vl-8b-instruct-unsloth-bnb-4bit"
-YOLO_WEIGHTS = "/workspace/model_weights/yolo/best.pt"
+YOLO_WEIGHTS = "/runpod-volume/model_weights/yolo/best.pt"
 
 DIAG_INSTRUCTION_JSON = """[REPORT_DIAGNOSIS_JSON]
 [SYSTEM ROLE]
@@ -73,11 +73,11 @@ def _ensure_yolo_loaded() -> YOLO:
     if _YOLO_MODEL is None:
         print("[DEBUG] YOLO_WEIGHTS =", YOLO_WEIGHTS)
         print("[DEBUG] exists? ->", os.path.exists(YOLO_WEIGHTS))
-        print("[DEBUG] list /workspace:", os.listdir("/workspace"))
-        if os.path.exists("/workspace/model_weights"):
-            print("[DEBUG] list /workspace/model_weights:", os.listdir("/workspace/model_weights"))
-        if os.path.exists("/workspace/model_weights/yolo"):
-            print("[DEBUG] list /workspace/model_weights/yolo:", os.listdir("/workspace/model_weights/yolo"))
+        print("[DEBUG] list /runpod-volume:", os.listdir("/runpod-volume"))
+        if os.path.exists("/runpod-volume/model_weights"):
+            print("[DEBUG] list /runpod-volume/model_weights:", os.listdir("/runpod-volume/model_weights"))
+        if os.path.exists("/runpod-volume/model_weights/yolo"):
+            print("[DEBUG] list /runpod-volume/model_weights/yolo:", os.listdir("/runpod-volume/model_weights/yolo"))
 
         if not os.path.isfile(YOLO_WEIGHTS):
             raise FileNotFoundError(f"YOLO weights not found: {YOLO_WEIGHTS}")
