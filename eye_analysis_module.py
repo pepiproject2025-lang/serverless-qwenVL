@@ -39,7 +39,7 @@ from eye_rag_chatbot2 import (
 # 설정 및 상수
 # -------------------------------
 
-CHECKPOINT_DIR = "/workspace/outputs_py/checkpoint-15020"
+CHECKPOINT_DIR = "/runpod-volume/outputs_py/checkpoint-15020"
 BASE_VL_MODEL_NAME = "unsloth/qwen3-vl-8b-instruct-unsloth-bnb-4bit"
 YOLO_WEIGHTS = "/runpod-volume/model_weights/yolo/best.pt"
 
