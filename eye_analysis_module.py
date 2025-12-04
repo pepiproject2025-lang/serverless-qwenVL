@@ -71,6 +71,7 @@ _VL_MODEL = None
 def _ensure_yolo_loaded() -> YOLO:
     global _YOLO_MODEL
     if _YOLO_MODEL is None:
+        # 디버그 출력
         print("[DEBUG] YOLO_WEIGHTS =", YOLO_WEIGHTS)
         print("[DEBUG] exists? ->", os.path.exists(YOLO_WEIGHTS))
         print("[DEBUG] list /runpod-volume:", os.listdir("/runpod-volume"))
