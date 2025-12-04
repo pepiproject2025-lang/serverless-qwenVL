@@ -32,5 +32,5 @@ except Exception as e:
 PY
 
 # Runpod serverless entrypoint: handler.py with handler(event)
-COPY handler.py .
+COPY handler.py eye_analysis_module.py eye_rag_chatbot2.py .
 CMD ["python3", "-u", "handler.py"]
