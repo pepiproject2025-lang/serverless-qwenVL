@@ -43,6 +43,12 @@ CHECKPOINT_DIR = "/runpod-volume/checkpoint-15020"
 BASE_VL_MODEL_NAME = "/runpod-volume/models/qwen3-vl-8b"
 YOLO_WEIGHTS = "/runpod-volume/model_weights/yolo/best.pt"
 
+print("[DEBUG] BASE_VL_MODEL_NAME =", BASE_VL_MODEL_NAME)
+print("[DEBUG] BASE_VL_MODEL_NAME isdir? ->", os.path.isdir(BASE_VL_MODEL_NAME))
+
+if os.path.exists("/runpod-volume/models"):
+    print("[DEBUG] list /runpod-volume/models:", os.listdir("/runpod-volume/models"))
+
 DIAG_INSTRUCTION_JSON = """[REPORT_DIAGNOSIS_JSON]
 [SYSTEM ROLE]
 당신은 동물의 안구 이미지를 분석하는 전문 수의 보조 AI입니다.
@@ -72,13 +78,13 @@ def _ensure_yolo_loaded() -> YOLO:
     global _YOLO_MODEL
     if _YOLO_MODEL is None:
         # 디버그 출력
-        print("[DEBUG] YOLO_WEIGHTS =", YOLO_WEIGHTS)
-        print("[DEBUG] exists? ->", os.path.exists(YOLO_WEIGHTS))
+        #print("[DEBUG] YOLO_WEIGHTS =", YOLO_WEIGHTS)
+        #print("[DEBUG] exists? ->", os.path.exists(YOLO_WEIGHTS))
         print("[DEBUG] list /runpod-volume:", os.listdir("/runpod-volume"))
-        if os.path.exists("/runpod-volume/model_weights"):
-            print("[DEBUG] list /runpod-volume/model_weights:", os.listdir("/runpod-volume/model_weights"))
-        if os.path.exists("/runpod-volume/model_weights/yolo"):
-            print("[DEBUG] list /runpod-volume/model_weights/yolo:", os.listdir("/runpod-volume/model_weights/yolo"))
+        # if os.path.exists("/runpod-volume/model_weights"):
+        #     print("[DEBUG] list /runpod-volume/model_weights:", os.listdir("/runpod-volume/model_weights"))
+        # if os.path.exists("/runpod-volume/model_weights/yolo"):
+        #     print("[DEBUG] list /runpod-volume/model_weights/yolo:", os.listdir("/runpod-volume/model_weights/yolo"))
 
         if not os.path.isfile(YOLO_WEIGHTS):
             raise FileNotFoundError(f"YOLO weights not found: {YOLO_WEIGHTS}")
