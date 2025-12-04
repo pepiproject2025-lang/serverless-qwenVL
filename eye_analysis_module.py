@@ -96,13 +96,14 @@ def _ensure_vl_lora_loaded() -> Tuple[Any, Any]:
         raise FileNotFoundError(f"LoRA checkpoint dir not found: {CHECKPOINT_DIR}")
 
     print("[System] Loading Qwen3-VL + LoRA model...")
-    _VL_PROCESSOR = AutoProcessor.from_pretrained(BASE_VL_MODEL_NAME, trust_remote_code=True)
+    _VL_PROCESSOR = AutoProcessor.from_pretrained(BASE_VL_MODEL_NAME, trust_remote_code=True, local_files_only=True,)
     
     base_model = AutoModelForVision2Seq.from_pretrained(
         BASE_VL_MODEL_NAME,
         device_map="auto",
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
+        local_files_only=True,
     )
     # LoRA 모델 로드 (PeftModel)
     _VL_MODEL = PeftModel.from_pretrained(base_model, CHECKPOINT_DIR).eval()
