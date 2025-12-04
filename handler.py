@@ -16,6 +16,28 @@ import runpod
 # 간단한 세션 저장 (case_id -> (bot, case))
 SESSIONS: dict[str, tuple[EyeRAGChatbot2, DogEyeCase]] = {}
 
+import requests
+
+def _load_image(image_input: str) -> Image.Image:
+    """
+    image_input이 URL이면 URL에서 다운로드,
+    base64이면 base64 디코딩으로 처리.
+    """
+    # URL 형태인지 확인
+    if image_input.startswith("http://") or image_input.startswith("https://"):
+        try:
+            resp = requests.get(image_input, timeout=10)
+            resp.raise_for_status()
+            return Image.open(io.BytesIO(resp.content)).convert("RGB")
+        except Exception as e:
+            raise ValueError(f"Failed to load image from URL: {e}")
+
+    # URL이 아니면 base64라고 가정
+    try:
+        return _decode_base64_image(image_input)
+    except Exception as e:
+        raise ValueError(f"Invalid base64 string: {e}")
+
 
 def _decode_base64_image(b64: str) -> Image.Image:
     data = base64.b64decode(b64)
@@ -44,7 +66,7 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
         if not images:
             return {"error": "images[0] (base64) is required for diag mode"}
 
-        img = _decode_base64_image(images[0])
+        img = _load_image(images[0])
 
         # 1-1. 진단 JSON
         diag_result = analyze_image(img)
