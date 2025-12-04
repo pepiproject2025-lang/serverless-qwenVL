@@ -71,6 +71,14 @@ _VL_MODEL = None
 def _ensure_yolo_loaded() -> YOLO:
     global _YOLO_MODEL
     if _YOLO_MODEL is None:
+        print("[DEBUG] YOLO_WEIGHTS =", YOLO_WEIGHTS)
+        print("[DEBUG] exists? ->", os.path.exists(YOLO_WEIGHTS))
+        print("[DEBUG] list /workspace:", os.listdir("/workspace"))
+        if os.path.exists("/workspace/model_weights"):
+            print("[DEBUG] list /workspace/model_weights:", os.listdir("/workspace/model_weights"))
+        if os.path.exists("/workspace/model_weights/yolo"):
+            print("[DEBUG] list /workspace/model_weights/yolo:", os.listdir("/workspace/model_weights/yolo"))
+
         if not os.path.isfile(YOLO_WEIGHTS):
             raise FileNotFoundError(f"YOLO weights not found: {YOLO_WEIGHTS}")
         print("[System] Loading YOLO model...")
