@@ -41,7 +41,7 @@ from eye_rag_chatbot2 import (
 
 CHECKPOINT_DIR = "/workspace/outputs_py/checkpoint-15020"
 BASE_VL_MODEL_NAME = "unsloth/qwen3-vl-8b-instruct-unsloth-bnb-4bit"
-YOLO_WEIGHTS = "/workspace/yolo_weights/best.pt"
+YOLO_WEIGHTS = "/workspace/model_weights/yolo/best.pt"
 
 DIAG_INSTRUCTION_JSON = """[REPORT_DIAGNOSIS_JSON]
 [SYSTEM ROLE]
