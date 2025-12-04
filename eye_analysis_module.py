@@ -40,14 +40,14 @@ from eye_rag_chatbot2 import (
 # -------------------------------
 
 CHECKPOINT_DIR = "/runpod-volume/checkpoint-15020"
-BASE_VL_MODEL_NAME = "/runpod-volume/models/qwen3-vl-8b"
+BASE_VL_MODEL_NAME = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
 YOLO_WEIGHTS = "/runpod-volume/model_weights/yolo/best.pt"
 
-print("[DEBUG] BASE_VL_MODEL_NAME =", BASE_VL_MODEL_NAME)
-print("[DEBUG] BASE_VL_MODEL_NAME isdir? ->", os.path.isdir(BASE_VL_MODEL_NAME))
+# print("[DEBUG] BASE_VL_MODEL_NAME =", BASE_VL_MODEL_NAME)
+# print("[DEBUG] BASE_VL_MODEL_NAME isdir? ->", os.path.isdir(BASE_VL_MODEL_NAME))
 
-if os.path.exists("/runpod-volume/models"):
-    print("[DEBUG] list /runpod-volume/models:", os.listdir("/runpod-volume/models"))
+# if os.path.exists("/runpod-volume/models"):
+#     print("[DEBUG] list /runpod-volume/models:", os.listdir("/runpod-volume/models"))
 
 DIAG_INSTRUCTION_JSON = """[REPORT_DIAGNOSIS_JSON]
 [SYSTEM ROLE]
