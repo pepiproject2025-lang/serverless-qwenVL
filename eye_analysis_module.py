@@ -40,7 +40,7 @@ from eye_rag_chatbot2 import (
 # -------------------------------
 
 CHECKPOINT_DIR = "/runpod-volume/checkpoint-15020"
-BASE_VL_MODEL_NAME = "unsloth/qwen3-vl-8b-instruct-unsloth-bnb-4bit"
+BASE_VL_MODEL_NAME = "/runpod-volume/models/qwen3-vl-8b"
 YOLO_WEIGHTS = "/runpod-volume/model_weights/yolo/best.pt"
 
 DIAG_INSTRUCTION_JSON = """[REPORT_DIAGNOSIS_JSON]
