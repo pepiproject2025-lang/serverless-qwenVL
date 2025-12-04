@@ -13,6 +13,15 @@ from eye_rag_chatbot2 import EyeRAGChatbot2, DogEyeCase
 
 import runpod
 
+import os, sys
+print("=== DEBUG: sys.path ===")
+print(sys.path)
+print("=== DEBUG: cwd ===")
+print(os.getcwd())
+print("=== DEBUG: files in cwd ===")
+print(os.listdir("."))
+print("==============================")
+
 # 간단한 세션 저장 (case_id -> (bot, case))
 SESSIONS: dict[str, tuple[EyeRAGChatbot2, DogEyeCase]] = {}
 
