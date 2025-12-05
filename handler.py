@@ -23,7 +23,7 @@ print(os.listdir("."))
 print("==============================")
 
 # 간단한 세션 저장 (case_id -> (bot, case))
-SESSIONS: dict[str, tuple[EyeRAGChatbot2, DogEyeCase]] = {}
+# SESSIONS: dict[str, tuple[EyeRAGChatbot2, DogEyeCase]] = {}
 
 import requests
 
@@ -85,34 +85,60 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
 
         # 1-3. 챗봇 세션 생성
         req_case_id = payload.get("case_id") or "case_001"
-        bot, case = create_chat_session(diag_result, report_md, case_id=req_case_id)
+        #bot, case = create_chat_session(diag_result, report_md, case_id=req_case_id)
 
         # 실제로 사용할 case_id는 case 객체에서 가져오기
-        real_case_id = case.case_id
-        SESSIONS[real_case_id] = (bot, case)
+        #real_case_id = case.case_id
+        #SESSIONS[real_case_id] = (bot, case)
 
         # Runpod 응답
         return {
             "output": report_md,        # FastAPI가 그냥 마크다운 보고서만 써도 되고
             "diagnosis": diag_result,   # 추가로 JSON 진단 정보도 같이 넘겨줌
-            "case_id": real_case_id,    # 나중에 chat 모드에서 사용할 세션 ID
+            "case_id": req_case_id,    # 나중에 chat 모드에서 사용할 세션 ID
             "mode": "diag",
         }
 
     # 2) 챗봇 Q&A
     elif mode == "chat":
-        case_id = payload.get("case_id")
+        case_id = payload.get("case_id") or "chat_session"
         question = payload.get("question") or payload.get("prompt")
         answer_mode = payload.get("answer_mode", "brief")
-        if not case_id or not question:
+        if not question:
             return {"error": "case_id and question are required for chat mode"}
 
-        if case_id not in SESSIONS:
-            return {"error": f"case_id '{case_id}' not found (diag 먼저 호출 필요)"}
+        # if case_id not in SESSIONS:
+        #     return {"error": f"case_id '{case_id}' not found (diag 먼저 호출 필요)"}
 
-        bot, case = SESSIONS[case_id]
+        # bot, case = SESSIONS[case_id]
+        # answer = bot.answer(case.case_id, question, mode=answer_mode)
+
+
+        diagnosis_block = payload.get("diagnosis") or {}
+        if isinstance(diagnosis_block, dict):
+            diagnosis_name = (diagnosis_block.get("diagnosis") or "").strip()
+            symptoms = diagnosis_block.get("symptoms") or []
+        else:
+            diagnosis_name = str(diagnosis_block)
+            symptoms = []
+
+        report_text = (
+            payload.get("report_text")
+            or payload.get("report")
+            or ""
+        )
+
+        bot = EyeRAGChatbot2()
+
+        case = bot.start_case(
+            case_id=case_id,
+            diagnosis=diagnosis_name,
+            report_text=report_text,
+            symptoms=[str(s) for s in symptoms],
+        )
+
         answer = bot.answer(case.case_id, question, mode=answer_mode)
-
+        
         return {
             "output": answer,
             "case_id": case_id,
