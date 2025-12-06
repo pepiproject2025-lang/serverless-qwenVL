@@ -196,7 +196,7 @@ class AppConfig:
             corpus_dir=os.getenv("EYE_RAG_CORPUS_DIR", "./corpus"),
             qwen_local_model_dir=os.getenv(
                 "QWEN_LOCAL_MODEL_DIR",
-                "/workspace/models/Qwen3_VL_8B_Instruct",
+                "/runpod-volume/models/Qwen3_VL_8B_Instruct",
             ),
             # qwen_api_key=os.getenv("QWEN_API_KEY") or None,
             # qwen_api_base=os.getenv(
