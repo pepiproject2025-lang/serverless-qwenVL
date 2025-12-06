@@ -176,7 +176,7 @@ class AppConfig:
     corpus_dir: str = "./corpus"
 
     # Qwen 관련
-    qwen_local_model_dir: str = "/workspace/models/Qwen3_VL_8B_Instruct"
+    qwen_local_model_dir: str = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
     # qwen_api_key: Optional[str] = None
     # qwen_api_base: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     # qwen_model: str = "qwen-vl-max"
