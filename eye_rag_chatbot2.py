@@ -636,6 +636,13 @@ def _call_qwen_local(messages: List[Dict[str, Any]], config: AppConfig) -> str:
     # 생성된 전체에서 프롬프트 부분 제거
     if output_text.startswith(prompt_text):
         output_text = output_text[len(prompt_text) :].strip()
+    
+    # 2차 생성 프롬프트 제거
+    if "assistant\n" in output_text.lower():
+        idx = output_text.lower().rfind("assistant\n")
+        candidate = output_text[idx + len("assistant\n") :].strip()
+        if candidate:
+            output_text = candidate
     return (output_text or "").strip()
 
 
