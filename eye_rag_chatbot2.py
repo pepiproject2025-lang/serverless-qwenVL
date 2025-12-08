@@ -176,7 +176,7 @@ class AppConfig:
     corpus_dir: str = "./corpus"
 
     # Qwen 관련
-    qwen_local_model_dir: str = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
+    qwen_local_model_dir: str = "/workspace/models/Qwen3_VL_8B_Instruct"
     # qwen_api_key: Optional[str] = None
     # qwen_api_base: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     # qwen_model: str = "qwen-vl-max"
@@ -196,7 +196,7 @@ class AppConfig:
             corpus_dir=os.getenv("EYE_RAG_CORPUS_DIR", "./corpus"),
             qwen_local_model_dir=os.getenv(
                 "QWEN_LOCAL_MODEL_DIR",
-                "/runpod-volume/models/Qwen3_VL_8B_Instruct",
+                "/workspace/models/Qwen3_VL_8B_Instruct",
             ),
             # qwen_api_key=os.getenv("QWEN_API_KEY") or None,
             # qwen_api_base=os.getenv(
@@ -636,13 +636,6 @@ def _call_qwen_local(messages: List[Dict[str, Any]], config: AppConfig) -> str:
     # 생성된 전체에서 프롬프트 부분 제거
     if output_text.startswith(prompt_text):
         output_text = output_text[len(prompt_text) :].strip()
-    
-    # 2차 생성 프롬프트 제거
-    if "assistant\n" in output_text.lower():
-        idx = output_text.lower().rfind("assistant\n")
-        candidate = output_text[idx + len("assistant\n") :].strip()
-        if candidate:
-            output_text = candidate
     return (output_text or "").strip()
 
 
@@ -760,16 +753,23 @@ def compose_messages(
         "role": "system",
         "content": (
             "당신은 반려견 안과 전문 수의사이면서, 보호자에게 친절하게 설명해 주는 상담 챗봇이에요. "
-            "아래 [RAG_CONTEXT]에 있는 정보와 케이스 리포트를 근거로만 답변해야 해요.\n\n"
+            "아래 [RAG_CONTEXT]와 케이스 리포트, 그리고 '진단명/증상 요약/보호자 질문' 정보를 종합해서 답변해야 해요.\n\n"
+            "역할:\n"
+            "- 항상 '보호자의 질문'에 가장 먼저 정확히 답하는 것을 최우선으로 하세요.\n"
+            "- 필요할 때만 진단명이 무엇을 의미하는지, 어떤 증상과 연관되는지, 가능한 원인과 예후, "
+            "병원에서 보통 어떻게 치료/경과 관찰을 하는지 등을 적절한 범위에서 골라서 설명하세요.\n"
+            "- 보호자의 질문과 직접 관련이 없는 내용은 과하게 늘어놓지 말고, 꼭 필요한 배경 설명만 간단히 덧붙이세요.\n"
+            "- 그 위에서 보호자가 집에서 할 수 있는 관리 방법과 주의점, 언제 다시 병원에 와야 하는지도 정리하되, "
+            "역시 질문과 관련된 부분을 중심으로 설명하세요.\n\n"
             "안전 규칙:\n"
             "- 실제 진단/치료를 대신하지 않는다는 점을 항상 상기시키세요.\n"
             "- 심한 통증, 시력 상실, 눈이 갑자기 하얗게 변함, 안구가 튀어나온 느낌, 눈을 지속적으로 감고 있는 경우 등은 "
             "반드시 즉시 오프라인 수의사/응급실 방문을 권고하세요.\n"
-            "- 약 이름, 용량, 구체적인 처방 변경, 기존 약을 임의로 중단/추가하도록 지시하지 마세요.\n"
-            "- 집에서 할 수 있는 관리(눈 주변 청결, 보호 콘 사용, 활동 제한 등)를 위주로 설명하세요.\n\n"
+            "- 약 이름, 용량, 구체적인 처방 변경, 기존 약을 임의로 중단/추가하도록 지시하지 마세요.\n\n"
             "답변 스타일:\n"
             "- 한국어로 말하고, 문장을 '...에요', '...해요'처럼 부드럽고 친근한 말투로 작성하세요.\n"
             "- 보호자가 초보라고 가정하고, 어려운 용어는 쉽게 풀어서 설명하세요.\n"
+            "- 각 질문마다 똑같은 문장을 복붙하지 말고, 상황과 질문에 맞게 문장을 조금씩 다르게 풀어서 설명하세요.\n"
             f"- 아래 지침에 맞게 답변 길이와 구조를 맞춰 주세요.\n"
             f"- 지침: {style['instruction']}\n\n"
             f"[RAG_CONTEXT]\n{ctx_block}\n"
@@ -792,8 +792,15 @@ def compose_messages(
             f"- 참고: 이미지 경로는 {case.image_path or '미지정'} 이고, "
             f"이미지는 이미 수의사가 검토해서 위 진단이 내려진 상태라고 가정해요.\n\n"
             f"보호자 질문: {question}\n\n"
-            "위 케이스를 기준으로 보호자가 집에서 무엇을 할 수 있고, "
-            "어떻게 관리해야 할지 위 지침에 맞춰 설명해 주세요.\n"
+            "위 케이스와 [RAG_CONTEXT] 정보를 함께 참고해서,\n"
+            "1) 먼저 보호자의 질문에 직접적으로 답을 주고,\n"
+            "2) 그 답을 이해하는 데 꼭 필요한 범위에서만\n"
+            "   - 이 진단명이 의미하는 점,\n"
+            "   - 현재 증상이 의미하는 상태,\n"
+            "   - 가능한 원인/예후,\n"
+            "   - 병원 치료/검사 방향,\n"
+            "   - 집에서 관리 방법\n"
+            "중에서 관련된 부분만 골라 간단히 덧붙여 설명해 주세요.\n"
             f"가능하면 최대 {max_lines}줄 이내로 정리해 주세요."
         ),
     }
