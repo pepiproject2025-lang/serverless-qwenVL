@@ -622,7 +622,7 @@ def _call_qwen_local(messages: List[Dict[str, Any]], config: AppConfig) -> str:
     gen_kwargs: Dict[str, Any] = dict(
         max_new_tokens=512,
         do_sample=True,
-        temperature=0.4,
+        temperature=0.7,
         top_p=0.9,
         eos_token_id=(getattr(tokenizer, "eos_token_id", None)),
     )
@@ -800,16 +800,10 @@ def compose_messages(
             f"- 참고: 이미지 경로는 {case.image_path or '미지정'} 이고, "
             f"이미지는 이미 수의사가 검토해서 위 진단이 내려진 상태라고 가정해요.\n\n"
             f"보호자 질문: {question}\n\n"
-            "위 케이스와 [RAG_CONTEXT] 정보를 함께 참고해서,\n"
-            "1) 먼저 보호자의 질문에 직접적으로 답을 주고,\n"
-            "2) 그 답을 이해하는 데 꼭 필요한 범위에서만\n"
-            "   - 이 진단명이 의미하는 점,\n"
-            "   - 현재 증상이 의미하는 상태,\n"
-            "   - 가능한 원인/예후,\n"
-            "   - 병원 치료/검사 방향,\n"
-            "   - 집에서 관리 방법\n"
-            "중에서 관련된 부분만 골라 간단히 덧붙여 설명해 주세요.\n"
-            f"가능하면 최대 {max_lines}줄 이내로 정리해 주세요."
+            "위 케이스와 [RAG_CONTEXT] 정보를 참고해서 보호자의 질문에 대해 친절하게 답변해 주세요.\n"
+            "의학적인 내용(진단명 정의, 원인 등)을 나열하기보다는, 보호자가 궁금해하는 점을 해소하는 데 집중하세요.\n"
+            "필요하다면 집에서 할 수 있는 관리 방법이나 주의사항을 자연스럽게 덧붙여도 좋아요.\n"
+            f"답변 길이는 질문의 성격에 맞춰 적절하게 조절해 주세요(권장 {max_lines}줄 내외)."
         ),
     }
 
