@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 eye_rag_chatbot2.py
--------------------
-LangChain ReAct Agent 기반의 챗봇 모듈 (Qwen3-VL + DuckDuckGo + Local Corpus)
 """
 
 import os
@@ -11,25 +9,28 @@ import torch
 from typing import Any, List, Optional, Dict
 from dataclasses import dataclass, field
 
-# LangChain & HuggingFace imports
+# Transformers
 from transformers import AutoModelForVision2Seq, AutoProcessor
+
+# LangChain Core
 from langchain_core.language_models.llms import LLM
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.prompts import PromptTemplate
+
+# LangChain Community Tools
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from langchain_community.tools import DuckDuckGoSearchResults
-#from langchain_classic.agents import create_react_agent, AgentExecutor
-# langchain_classic이 아니라 langchain.agents를 사용해야 합니다.
-from langchain.agents import create_react_agent, AgentExecutor
+
+# ⭐️ langchain_classic 사용
+from langchain_classic.agents import create_react_agent, AgentExecutor
 
 # ----------------------------------
-# 1) 전역 설정 및 모델 캐싱 (Cold Start 방지)
+# 전역 설정
 # ----------------------------------
-
-MODEL_DIR = "/workspace/models/Qwen3_VL_8B_Instruct"  # 경로 확인 필요
+MODEL_DIR = "/workspace/models/Qwen3_VL_8B_Instruct"
 CORPUS_DIR = "/workspace/corpus/"
 
-# 전역 변수로 모델을 잡아두어 핸들러가 재호출될 때 리로딩 방지
+# 모델 전역 캐싱 (Cold Start 방지)
 _GLOBAL_MODEL = None
 _GLOBAL_PROCESSOR = None
 
@@ -58,7 +59,7 @@ def load_global_model():
         raise e
 
 # ----------------------------------
-# 2) Custom LLM Wrapper (노트북 코드 적용)
+# Custom LLM Wrapper (노트북 코드 동일)
 # ----------------------------------
 class QwenVLLLM(LLM):
     model: Any = None
@@ -71,7 +72,6 @@ class QwenVLLLM(LLM):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        # Qwen-VL 채팅 포맷 적용
         messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         
@@ -80,9 +80,9 @@ class QwenVLLLM(LLM):
         ).to(self.model.device)
 
         gen_kwargs = {
-            "max_new_tokens": 1024, # 답변 길이 확보
+            "max_new_tokens": 1024,
             "do_sample": True,
-            "temperature": 0.1,     # 사실 기반 답변을 위해 낮춤
+            "temperature": 0.1,
             "repetition_penalty": 1.1,
             "top_p": 0.9,
             **kwargs
@@ -98,7 +98,6 @@ class QwenVLLLM(LLM):
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )[0]
 
-        # Stop Token 처리
         if stop:
             for s in stop:
                 if s in output_text:
@@ -110,30 +109,21 @@ class QwenVLLLM(LLM):
         return "qwen-vl-custom"
 
 # ----------------------------------
-# 3) Local Knowledge Loader (노트북 코드 적용)
+# Local Knowledge Loader
 # ----------------------------------
 def load_local_knowledge(diagnosis_name: str) -> str:
-    """
-    진단명(예: 결막염)을 입력받아 /workspace/corpus/결막염.txt 파일을 읽어서 반환합니다.
-    """
     filename = f"{diagnosis_name}.txt"
     filepath = os.path.join(CORPUS_DIR, filename)
-    
     try:
         if os.path.exists(filepath):
             with open(filepath, "r", encoding="utf-8") as f:
-                content = f.read()
-            print(f"[System] 내부 문서 로드 성공: {filename}")
-            return content
-        else:
-            print(f"[System] 내부 문서 없음: {filename}")
-            return "해당 질환에 대한 내부 상세 지침 파일이 존재하지 않습니다."
-            
+                return f.read()
+        return "해당 질환에 대한 내부 상세 지침 파일이 존재하지 않습니다."
     except Exception as e:
         return f"내부 문서 로딩 중 오류 발생: {e}"
 
 # ----------------------------------
-# 4) EyeRAGChatbot2 Class (LangChain Agent Encapsulation)
+# 챗봇 클래스
 # ----------------------------------
 @dataclass
 class DogEyeCase:
@@ -144,19 +134,16 @@ class DogEyeCase:
 
 class EyeRAGChatbot2:
     def __init__(self):
-        # 1. 모델 로드 (전역 캐시 활용)
+        # 1. 모델 로드
         model, processor = load_global_model()
         self.llm = QwenVLLLM(model=model, processor=processor)
 
-        # 2. 도구 설정 (DuckDuckGo HTML backend - 차단 우회)
-        wrapper = DuckDuckGoSearchAPIWrapper(
-            backend="html", 
-            max_results=5
-        )
+        # 2. 도구 설정 (DuckDuckGo HTML backend)
+        wrapper = DuckDuckGoSearchAPIWrapper(backend="html", max_results=5)
         self.search_tool = DuckDuckGoSearchResults(api_wrapper=wrapper, source="text")
         self.tools = [self.search_tool]
 
-        # 3. 프롬프트 템플릿 정의 (노트북 최신 버전)
+        # 3. 프롬프트 (노트북의 최종 수정 버전: 한자 금지, 자연스러운 말투)
         self.template = """
 당신은 **'친절하고 전문적인 반려동물 안과 수의사 AI'**입니다.
 보호자의 걱정에 공감하며, [진단 요약]과 [원내 의학 지침]을 바탕으로 정확하고 이해하기 쉽게 설명해 주세요.
@@ -210,7 +197,7 @@ Thought: {agent_scratchpad}
 """
         self.prompt = PromptTemplate.from_template(self.template)
 
-        # 4. 에이전트 생성
+        # 4. 에이전트 생성 (langchain_classic 사용)
         self.agent = create_react_agent(self.llm, self.tools, self.prompt)
         self.agent_executor = AgentExecutor(
             agent=self.agent,
@@ -220,35 +207,16 @@ Thought: {agent_scratchpad}
             max_iterations=3,
         )
 
-    def start_case(
-        self,
-        case_id: str,
-        diagnosis: str,
-        report_text: str,
-        symptoms: Optional[List[str]] = None,
-        image_path: Optional[str] = None, # 호환성 유지용
-    ) -> DogEyeCase:
-        """
-        새로운 케이스 정보를 생성합니다.
-        """
-        return DogEyeCase(
-            case_id=case_id,
-            diagnosis=diagnosis,
-            report_text=report_text,
-            symptoms=symptoms or []
-        )
+    def start_case(self, case_id, diagnosis, report_text, symptoms=None):
+        return DogEyeCase(case_id, diagnosis, report_text, symptoms or [])
 
-    def answer(self, case_id: str, question: str, case: DogEyeCase, chat_history_str: str) -> str:
-        """
-        LangChain Agent를 실행하여 답변을 생성합니다.
-        """
-        # Context 구성 (진단 정보 + 리포트 내용)
+    def answer(self, case, question, chat_history_str):
+        # Context 구성
         diag_info = f"""
 - 진단명: {case.diagnosis}
 - 증상: {', '.join(case.symptoms)}
 - 내부 리포트 요약: {case.report_text[:500]}...
 """
-        # Local Knowledge 로드
         local_text = load_local_knowledge(case.diagnosis)
 
         try:
@@ -260,5 +228,5 @@ Thought: {agent_scratchpad}
             })
             return response["output"]
         except Exception as e:
-            print(f"Agent Execution Error: {e}")
-            return "죄송해요, 답변을 생성하는 도중 문제가 발생했어요. 잠시 후 다시 시도해 주세요. 😢"
+            print(f"Agent Error: {e}")
+            return "죄송해요, 잠시 후 다시 시도해 주세요. 😢"

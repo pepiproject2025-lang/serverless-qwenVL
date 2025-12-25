@@ -18,6 +18,7 @@ ultralytics==8.3.227
 ultralytics-thop==2.0.18
 langchain>=0.1.0
 langchain-community
+langchain-classic
 langchain-core
 langchain-huggingface
 duckduckgo-search
