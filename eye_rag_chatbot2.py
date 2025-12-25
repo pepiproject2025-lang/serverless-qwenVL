@@ -21,30 +21,18 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from langchain_community.tools import DuckDuckGoSearchResults
 
-# LangChain Agents
-from langchain.agents import create_react_agent, AgentExecutor
+# ⭐️ [요청하신 대로 수정] Pod 환경과 동일하게 langchain_classic 사용
+from langchain_classic.agents import create_react_agent, AgentExecutor
 
 # ----------------------------------
-# [복구] AppConfig 클래스 (다른 모듈과의 호환성 유지용)
+# AppConfig (의존성 유지)
 # ----------------------------------
 @dataclass
 class AppConfig:
-    """
-    eye_analysis_module.py 등 다른 모듈에서 이 클래스를 참조하므로
-    삭제하지 않고 유지합니다. (실제 사용은 안 하더라도 정의는 필요함)
-    """
-    # 검색/코퍼스 관련
     use_ddg: bool = True
-    use_wiki: bool = True
-    k: int = 12
-    wiki_pages: int = 1
-    corpus_dir: str = "/workspace/corpus"
-
-    # Qwen 관련
-    qwen_local_model_dir: str = "/workspace/models/Qwen3_VL_8B_Instruct"
-    answer_max_lines: int = 5
-    max_history_turns: int = 4
-
+    corpus_dir: str = "/runpod-volume/corpus"
+    qwen_local_model_dir: str = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
+    
     @classmethod
     def from_env(cls) -> "AppConfig":
         return cls()
@@ -52,10 +40,10 @@ class AppConfig:
 # ----------------------------------
 # 전역 설정
 # ----------------------------------
-MODEL_DIR = "/workspace/models/Qwen3_VL_8B_Instruct"
-CORPUS_DIR = "/workspace/corpus/"
+MODEL_DIR = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
+CORPUS_DIR = "/runpod-volume/corpus/"
 
-# 모델 전역 캐싱 (Cold Start 방지)
+# 모델 전역 캐싱
 _GLOBAL_MODEL = None
 _GLOBAL_PROCESSOR = None
 
@@ -159,15 +147,11 @@ class DogEyeCase:
 
 class EyeRAGChatbot2:
     def __init__(self, config: Optional[AppConfig] = None):
-        """
-        호환성을 위해 config 파라미터를 받지만,
-        내부적으로는 LangChain 로직을 사용합니다.
-        """
         # 1. 모델 로드
         model, processor = load_global_model()
         self.llm = QwenVLLLM(model=model, processor=processor)
 
-        # 2. 도구 설정 (DuckDuckGo HTML backend)
+        # 2. 도구 설정
         wrapper = DuckDuckGoSearchAPIWrapper(backend="html", max_results=5)
         self.search_tool = DuckDuckGoSearchResults(api_wrapper=wrapper, source="text")
         self.tools = [self.search_tool]
@@ -202,12 +186,9 @@ Final Answer: 첫 문장은 상황에 맞게 유연하게 하세요.
    - 예: '물样' -> '물 같은', '剧痛' -> '심한 통증', '很快' -> '빠르게'
    - 모든 전문 용어는 **한글**로 풀어서 쓰세요.
 2. **자연스러운 한국어 사용**:
-   - 기계적인 번역투("당신의 사랑받는 반려견을 위해...")를 피하세요.
-   - 실제 한국 동물병원 수의사 선생님처럼 **"~해 주시는 게 좋아요", "~일 가능성이 높아요"** 처럼 자연스럽게 말하세요.
+   - 기계적인 번역투를 피하고, 동네 수의사 선생님처럼 자연스럽게 말하세요.
 3. **가독성**:
-   - 줄글보다는 **번호(1., 2.)**를 사용해 정리해 주세요.
-   - 핵심 내용은 **볼드체**로 강조하세요.
-   - 이모지를 적절히 사용하여(1~2개 정도) 딱딱하지 않게 해 주세요.
+   - 번호(1., 2.)와 볼드체를 적극 활용하세요.
 
 [진단 요약]
 {context}
@@ -226,8 +207,9 @@ Thought: {agent_scratchpad}
 """
         self.prompt = PromptTemplate.from_template(self.template)
 
-        # 4. 에이전트 생성
+        # 4. 에이전트 생성 (langchain_classic 사용)
         self.agent = create_react_agent(self.llm, self.tools, self.prompt)
+        
         self.agent_executor = AgentExecutor(
             agent=self.agent,
             tools=self.tools,
@@ -237,11 +219,9 @@ Thought: {agent_scratchpad}
         )
 
     def start_case(self, case_id, diagnosis, report_text, symptoms=None, image_path=None):
-        # image_path 인자 추가 (호환성용)
         return DogEyeCase(case_id, diagnosis, report_text, symptoms or [])
 
     def answer(self, case, question, chat_history_str):
-        # Context 구성
         diag_info = f"""
 - 진단명: {case.diagnosis}
 - 증상: {', '.join(case.symptoms)}
