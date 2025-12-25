@@ -18,7 +18,9 @@ from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.prompts import PromptTemplate
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from langchain_community.tools import DuckDuckGoSearchResults
-from langchain_classic.agents import create_react_agent, AgentExecutor
+#from langchain_classic.agents import create_react_agent, AgentExecutor
+# langchain_classic이 아니라 langchain.agents를 사용해야 합니다.
+from langchain.agents import create_react_agent, AgentExecutor
 
 # ----------------------------------
 # 1) 전역 설정 및 모델 캐싱 (Cold Start 방지)
