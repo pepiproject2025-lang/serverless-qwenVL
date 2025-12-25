@@ -59,7 +59,7 @@ def load_global_model():
         raise e
 
 # ----------------------------------
-# [레거시 호환용] 데이터 클래스 복구 (AppConfig, ChatbotState, DogEyeCase)
+# [호환성 복구] 레거시 데이터 클래스
 # ----------------------------------
 @dataclass
 class AppConfig:
@@ -77,23 +77,33 @@ class DogEyeCase:
     diagnosis: str
     report_text: str
     symptoms: List[str] = field(default_factory=list)
-    # 호환성을 위해 추가 필드 유지
     image_path: Optional[str] = None
     history: List[Dict[str, str]] = field(default_factory=list)
 
 @dataclass
 class ChatbotState:
-    """
-    eye_analysis_module.py에서 이 클래스를 참조하므로 복구합니다.
-    """
     config: AppConfig
-    # 기존 코드와의 호환성을 위해 local_by_diag 필드 유지 (빈 딕셔너리로 초기화)
     local_by_diag: Dict[str, Any] = field(default_factory=dict)
     cases: Dict[str, DogEyeCase] = field(default_factory=dict)
 
+# ----------------------------------
+# [호환성 복구] 레거시 함수들 (build_ctx_block 등)
+# ----------------------------------
 def create_chatbot_state(config: Optional[AppConfig] = None) -> ChatbotState:
-    """호환성 유지를 위한 팩토리 함수"""
     return ChatbotState(config=config or AppConfig())
+
+def build_ctx_block(ctx_docs: List[Dict[str, Any]]) -> str:
+    """
+    eye_analysis_module.py에서 이 함수를 호출하여 리포트를 만들 때 사용합니다.
+    단순 문자열 변환으로 호환성을 유지합니다.
+    """
+    lines = []
+    for i, d in enumerate(ctx_docs, 1):
+        title = d.get('title', 'Untitled')
+        url = d.get('url', 'no-url')
+        text = d.get('text', '')[:200]
+        lines.append(f"[{i}] {title} :: {url}\n{text}")
+    return "\n\n".join(lines)
 
 # ----------------------------------
 # Custom LLM Wrapper
@@ -203,9 +213,12 @@ Final Answer: 첫 문장은 상황에 맞게 유연하게 하세요.
    - 예: '물样' -> '물 같은', '剧痛' -> '심한 통증', '很快' -> '빠르게'
    - 모든 전문 용어는 **한글**로 풀어서 쓰세요.
 2. **자연스러운 한국어 사용**:
-   - 기계적인 번역투를 피하고, 동네 수의사 선생님처럼 자연스럽게 말하세요.
+   - 기계적인 번역투("당신의 사랑받는 반려견을 위해...")를 피하세요.
+   - 실제 한국 동물병원 수의사 선생님처럼 **"~해 주시는 게 좋아요", "~일 가능성이 높아요"** 처럼 자연스럽게 말하세요.
 3. **가독성**:
-   - 번호(1., 2.)와 볼드체를 적극 활용하세요.
+   - 줄글보다는 **번호(1., 2.)**를 사용해 정리해 주세요.
+   - 핵심 내용은 **볼드체**로 강조하세요.
+   - 이모지를 적절히 사용하여(1~2개 정도) 딱딱하지 않게 해 주세요.
 
 [진단 요약]
 {context}
@@ -224,9 +237,8 @@ Thought: {agent_scratchpad}
 """
         self.prompt = PromptTemplate.from_template(self.template)
 
-        # 4. 에이전트 생성 (langchain_classic 사용)
+        # 4. 에이전트 생성
         self.agent = create_react_agent(self.llm, self.tools, self.prompt)
-        
         self.agent_executor = AgentExecutor(
             agent=self.agent,
             tools=self.tools,
@@ -257,3 +269,39 @@ Thought: {agent_scratchpad}
         except Exception as e:
             print(f"Agent Error: {e}")
             return "죄송해요, 잠시 후 다시 시도해 주세요. 😢"
+
+# ----------------------------------
+# [호환성 복구] 레거시 함수 래퍼 (start_case, answer_question)
+# ----------------------------------
+def start_case(state: ChatbotState, case_id: str, diagnosis: str, report_text: str, image_path: Optional[str] = None, symptoms: Optional[List[str]] = None) -> DogEyeCase:
+    """기존 코드 호환용 래퍼"""
+    bot = EyeRAGChatbot2()
+    case = bot.start_case(case_id, diagnosis, report_text, symptoms, image_path)
+    state.cases[case_id] = case
+    return case
+
+def answer_question(state: ChatbotState, case_id: str, question: str, mode: str = "brief") -> str:
+    """기존 코드 호환용 래퍼 (내부는 새로운 봇 사용)"""
+    case = state.cases.get(case_id)
+    if not case:
+        return "오류: 케이스를 찾을 수 없습니다."
+    
+    # 히스토리 변환
+    history_str = ""
+    for msg in case.history:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role == "user":
+            history_str += f"User: {content}\n"
+        elif role == "assistant":
+            history_str += f"AI: {content}\n"
+    
+    # 봇 인스턴스 생성 및 답변
+    bot = EyeRAGChatbot2()
+    answer = bot.answer(case, question, history_str)
+    
+    # 히스토리 업데이트
+    case.history.append({"role": "user", "content": question})
+    case.history.append({"role": "assistant", "content": answer})
+    
+    return answer
