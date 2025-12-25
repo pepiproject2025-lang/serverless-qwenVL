@@ -21,27 +21,14 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from langchain_community.tools import DuckDuckGoSearchResults
 
-# ⭐️ [요청하신 대로 수정] Pod 환경과 동일하게 langchain_classic 사용
+# ⭐️ [Pod 환경 표준] langchain_classic 사용
 from langchain_classic.agents import create_react_agent, AgentExecutor
-
-# ----------------------------------
-# AppConfig (의존성 유지)
-# ----------------------------------
-@dataclass
-class AppConfig:
-    use_ddg: bool = True
-    corpus_dir: str = "/runpod-volume/corpus"
-    qwen_local_model_dir: str = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
-    
-    @classmethod
-    def from_env(cls) -> "AppConfig":
-        return cls()
 
 # ----------------------------------
 # 전역 설정
 # ----------------------------------
-MODEL_DIR = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
-CORPUS_DIR = "/runpod-volume/corpus/"
+MODEL_DIR = "/workspace/models/Qwen3_VL_8B_Instruct"
+CORPUS_DIR = "/workspace/corpus/"
 
 # 모델 전역 캐싱
 _GLOBAL_MODEL = None
@@ -70,6 +57,43 @@ def load_global_model():
     except Exception as e:
         print(f"Model Load Failed: {e}")
         raise e
+
+# ----------------------------------
+# [레거시 호환용] 데이터 클래스 복구 (AppConfig, ChatbotState, DogEyeCase)
+# ----------------------------------
+@dataclass
+class AppConfig:
+    use_ddg: bool = True
+    corpus_dir: str = "/workspace/corpus"
+    qwen_local_model_dir: str = "/workspace/models/Qwen3_VL_8B_Instruct"
+    
+    @classmethod
+    def from_env(cls) -> "AppConfig":
+        return cls()
+
+@dataclass
+class DogEyeCase:
+    case_id: str
+    diagnosis: str
+    report_text: str
+    symptoms: List[str] = field(default_factory=list)
+    # 호환성을 위해 추가 필드 유지
+    image_path: Optional[str] = None
+    history: List[Dict[str, str]] = field(default_factory=list)
+
+@dataclass
+class ChatbotState:
+    """
+    eye_analysis_module.py에서 이 클래스를 참조하므로 복구합니다.
+    """
+    config: AppConfig
+    # 기존 코드와의 호환성을 위해 local_by_diag 필드 유지 (빈 딕셔너리로 초기화)
+    local_by_diag: Dict[str, Any] = field(default_factory=dict)
+    cases: Dict[str, DogEyeCase] = field(default_factory=dict)
+
+def create_chatbot_state(config: Optional[AppConfig] = None) -> ChatbotState:
+    """호환성 유지를 위한 팩토리 함수"""
+    return ChatbotState(config=config or AppConfig())
 
 # ----------------------------------
 # Custom LLM Wrapper
@@ -136,15 +160,8 @@ def load_local_knowledge(diagnosis_name: str) -> str:
         return f"내부 문서 로딩 중 오류 발생: {e}"
 
 # ----------------------------------
-# 챗봇 클래스
+# 챗봇 클래스 (메인 로직)
 # ----------------------------------
-@dataclass
-class DogEyeCase:
-    case_id: str
-    diagnosis: str
-    report_text: str
-    symptoms: List[str] = field(default_factory=list)
-
 class EyeRAGChatbot2:
     def __init__(self, config: Optional[AppConfig] = None):
         # 1. 모델 로드
