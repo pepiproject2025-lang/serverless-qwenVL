@@ -28,8 +28,8 @@ from langchain_classic.agents import create_react_agent, AgentExecutor
 # ----------------------------------
 # 전역 설정 & 모델 캐싱
 # ----------------------------------
-MODEL_DIR = "/workspace/models/Qwen3_VL_8B_Instruct"
-CORPUS_DIR = "/workspace/corpus/"
+MODEL_DIR = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
+CORPUS_DIR = "/runpod-volume/corpus/"
 
 _GLOBAL_MODEL = None
 _GLOBAL_PROCESSOR = None
@@ -62,8 +62,8 @@ class AppConfig:
     use_wiki: bool = True
     k: int = 12
     wiki_pages: int = 1
-    corpus_dir: str = "/workspace/corpus"
-    qwen_local_model_dir: str = "/workspace/models/Qwen3_VL_8B_Instruct"
+    corpus_dir: str = "/runpod-volume/corpus"
+    qwen_local_model_dir: str = "/runpod-volume/models/Qwen3_VL_8B_Instruct"
     answer_max_lines: int = 5
     max_history_turns: int = 4
 
