@@ -150,6 +150,12 @@ def answer_question(state: ChatbotState, case_id: str, question: str, mode: str 
 # ----------------------------------
 # [메인] 새로운 LangChain 로직
 # ----------------------------------
+from typing import Sequence
+try:
+    from langchain_core.tools import BaseTool
+except Exception:
+    BaseTool = object
+
 class QwenVLLLM(LLM):
     model: Any = None
     processor: Any = None
@@ -170,6 +176,10 @@ class QwenVLLLM(LLM):
             for s in stop:
                 if s in output_text: output_text = output_text.split(s)[0]
         return output_text
+    
+    def bind_tools(self, tools: Sequence[BaseTool], **kwargs):
+        # classic ReAct(텍스트 파싱 기반)는 네이티브 tool-calling 없어도 동작 가능
+        return self
 
     @property
     def _llm_type(self) -> str: return "qwen-vl-custom"

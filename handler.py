@@ -8,6 +8,7 @@ from PIL import Image
 from eye_analysis_module import analyze_image, generate_report
 from eye_rag_chatbot2 import EyeRAGChatbot2, DogEyeCase
 import runpod
+import traceback
 
 def _load_image(image_input: str) -> Image.Image:
     if image_input.startswith("http"):
@@ -88,6 +89,7 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
                 "mode": "chat"
             }
         except Exception as e:
+            traceback.print_exc()
             return {"error": f"Chatbot Error: {str(e)}"}
 
     return {"error": f"unknown mode: {mode}"}
