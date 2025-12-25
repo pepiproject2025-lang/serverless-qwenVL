@@ -22,3 +22,4 @@ langchain-classic
 langchain-core
 langchain-huggingface
 duckduckgo-search
+ddgs
